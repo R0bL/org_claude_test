@@ -1,0 +1,403 @@
+{
+  "link_type": "link_only",
+  "probability_two_random_records_match": 1e-06,
+  "retain_matching_columns": true,
+  "retain_intermediate_calculation_columns": false,
+  "additional_columns_to_retain": [],
+  "sql_dialect": "duckdb",
+  "linker_uid": "126n6369",
+  "em_convergence": 0.0001,
+  "max_iterations": 25,
+  "bayes_factor_column_prefix": "bf_",
+  "term_frequency_adjustment_column_prefix": "tf_",
+  "comparison_vector_value_column_prefix": "gamma_",
+  "unique_id_column_name": "unique_id",
+  "source_dataset_column_name": "source_dataset",
+  "blocking_rules_to_generate_predictions": [
+    {
+      "blocking_rule": "l.name_normalized = r.name_normalized",
+      "sql_dialect": "duckdb"
+    },
+    {
+      "blocking_rule": "substr(l.name_normalized, 1, 25) = substr(r.name_normalized, 1, 25) AND l.country_code = r.country_code",
+      "sql_dialect": "duckdb"
+    },
+    {
+      "blocking_rule": "l.distinctive_token = r.distinctive_token AND l.city = r.city",
+      "sql_dialect": "duckdb"
+    },
+    {
+      "blocking_rule": "l.name_metaphone = r.name_metaphone AND l.country_code = r.country_code AND l.city = r.city",
+      "sql_dialect": "duckdb"
+    }
+  ],
+  "comparisons": [
+    {
+      "output_column_name": "name_normalized",
+      "comparison_levels": [
+        {
+          "sql_condition": "\"name_normalized_l\" IS NULL OR \"name_normalized_r\" IS NULL",
+          "label_for_charts": "name_normalized is NULL",
+          "fix_m_probability": false,
+          "fix_u_probability": false,
+          "is_null_level": true
+        },
+        {
+          "sql_condition": "\"name_normalized_l\" = \"name_normalized_r\"",
+          "label_for_charts": "Exact match on name_normalized",
+          "m_probability": 0.09439256709082217,
+          "u_probability": 9.641283977993769e-06,
+          "fix_m_probability": false,
+          "fix_u_probability": false,
+          "tf_adjustment_column": "name_normalized",
+          "tf_adjustment_weight": 1.0
+        },
+        {
+          "sql_condition": "jaro_winkler_similarity(\"name_normalized_l\", \"name_normalized_r\") >= 0.95",
+          "label_for_charts": "Jaro-Winkler distance of name_normalized >= 0.95",
+          "m_probability": 0.0018490114964220556,
+          "u_probability": 2.008600828748702e-06,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "jaro_winkler_similarity(\"name_normalized_l\", \"name_normalized_r\") >= 0.88",
+          "label_for_charts": "Jaro-Winkler distance of name_normalized >= 0.88",
+          "m_probability": 0.04602048653797184,
+          "u_probability": 0.00013839259710078558,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "jaro_winkler_similarity(\"name_normalized_l\", \"name_normalized_r\") >= 0.8",
+          "label_for_charts": "Jaro-Winkler distance of name_normalized >= 0.8",
+          "m_probability": 0.29021342199310873,
+          "u_probability": 0.0016995775912457141,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "ELSE",
+          "label_for_charts": "All other comparisons",
+          "m_probability": 0.4618190209646907,
+          "u_probability": 0.9981503799268467,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        }
+      ],
+      "comparison_description": "JaroWinklerAtThresholds"
+    },
+    {
+      "output_column_name": "phonetic_match",
+      "comparison_levels": [
+        {
+          "sql_condition": "\"distinctive_soundex_l\" IS NULL OR \"distinctive_soundex_r\" IS NULL",
+          "label_for_charts": "distinctive_soundex is NULL",
+          "fix_m_probability": false,
+          "fix_u_probability": false,
+          "is_null_level": true
+        },
+        {
+          "sql_condition": "\"distinctive_soundex_l\" = \"distinctive_soundex_r\"",
+          "label_for_charts": "Exact match on distinctive_soundex",
+          "m_probability": 0.4072576818327149,
+          "u_probability": 0.001050291343259096,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "ELSE",
+          "label_for_charts": "All other comparisons",
+          "m_probability": 0.8398952775981493,
+          "u_probability": 0.9989497086567409,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        }
+      ],
+      "comparison_description": "CustomComparison"
+    },
+    {
+      "output_column_name": "distinctive_match",
+      "comparison_levels": [
+        {
+          "sql_condition": "\"distinctive_tokens_l\" IS NULL OR \"distinctive_tokens_r\" IS NULL",
+          "label_for_charts": "distinctive_tokens is NULL",
+          "fix_m_probability": false,
+          "fix_u_probability": false,
+          "is_null_level": true
+        },
+        {
+          "sql_condition": "array_length(distinctive_tokens_l, 1) = 0 OR array_length(distinctive_tokens_r, 1) = 0",
+          "label_for_charts": "Empty array (short name)",
+          "m_probability": 0.00011201233515597098,
+          "u_probability": 0.0012670255300624397,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "array_length(list_intersect(\"distinctive_tokens_l\", \"distinctive_tokens_r\")) >= 2",
+          "label_for_charts": "Array intersection size >= 2",
+          "m_probability": 0.0942440403729413,
+          "u_probability": 4.839194179794738e-05,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "array_length(list_intersect(\"distinctive_tokens_l\", \"distinctive_tokens_r\")) >= 1",
+          "label_for_charts": "Array intersection size >= 1",
+          "m_probability": 0.5600069570318617,
+          "u_probability": 0.0020418989881465844,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "ELSE",
+          "label_for_charts": "All other comparisons",
+          "m_probability": 0.7428407956687446,
+          "u_probability": 0.9966426835399931,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        }
+      ],
+      "comparison_description": "CustomComparison"
+    },
+    {
+      "output_column_name": "token_overlap",
+      "comparison_levels": [
+        {
+          "sql_condition": "\"distinctive_tokens_l\" IS NULL OR \"distinctive_tokens_r\" IS NULL",
+          "label_for_charts": "distinctive_tokens is NULL",
+          "fix_m_probability": false,
+          "fix_u_probability": false,
+          "is_null_level": true
+        },
+        {
+          "sql_condition": "array_length(list_intersect(\"distinctive_tokens_l\", \"distinctive_tokens_r\")) >= 2",
+          "label_for_charts": "Array intersection size >= 2",
+          "m_probability": 0.0942440403729413,
+          "u_probability": 4.839194179794738e-05,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "array_length(list_intersect(\"distinctive_tokens_l\", \"distinctive_tokens_r\")) >= 1",
+          "label_for_charts": "Array intersection size >= 1",
+          "m_probability": 0.5600069570318617,
+          "u_probability": 0.0020418989881465844,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "ELSE",
+          "label_for_charts": "All other comparisons",
+          "m_probability": 0.3719772177851761,
+          "u_probability": 0.9979097090700555,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        }
+      ],
+      "comparison_description": "CustomComparison"
+    },
+    {
+      "output_column_name": "containment_check",
+      "comparison_levels": [
+        {
+          "sql_condition": "\"name_tokens_l\" IS NULL OR \"name_tokens_r\" IS NULL",
+          "label_for_charts": "name_tokens is NULL",
+          "fix_m_probability": false,
+          "fix_u_probability": false,
+          "is_null_level": true
+        },
+        {
+          "sql_condition": "list_sort(name_tokens_l) = list_sort(name_tokens_r)",
+          "label_for_charts": "Exact token match",
+          "m_probability": 0.12192737915195988,
+          "u_probability": 9.738627291288165e-06,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "\n                ABS(len(name_tokens_l) - len(name_tokens_r)) <= 1\n                AND len(list_intersect(name_tokens_l, name_tokens_r)) >= \n                    GREATEST(len(name_tokens_l), len(name_tokens_r)) - 1\n            ",
+          "label_for_charts": "Similar tokens (diff <= 1)",
+          "m_probability": 0.048415739684973765,
+          "u_probability": 0.025987376329473223,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "\n                (len(name_tokens_l) <= 2 OR len(name_tokens_r) <= 2)\n                AND len(list_intersect(name_tokens_l, name_tokens_r)) >= 1\n            ",
+          "label_for_charts": "Short name with overlap",
+          "m_probability": 0.11122311416343231,
+          "u_probability": 0.0075115939863876074,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "\n                (list_sort(list_intersect(name_tokens_l, name_tokens_r)) = list_sort(name_tokens_l)\n                 AND len(name_tokens_l) < len(name_tokens_r))\n                OR\n                (list_sort(list_intersect(name_tokens_l, name_tokens_r)) = list_sort(name_tokens_r)\n                 AND len(name_tokens_r) < len(name_tokens_l))\n            ",
+          "label_for_charts": "Subset containment (suspicious)",
+          "m_probability": 0.0016796342507550649,
+          "u_probability": 0.0002710751926441036,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "ELSE",
+          "label_for_charts": "All other comparisons",
+          "m_probability": 0.7196209073634167,
+          "u_probability": 0.9662202158642038,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        }
+      ],
+      "comparison_description": "CustomComparison"
+    },
+    {
+      "output_column_name": "first_token_match",
+      "comparison_levels": [
+        {
+          "sql_condition": "\"distinctive_token_l\" IS NULL OR \"distinctive_token_r\" IS NULL",
+          "label_for_charts": "distinctive_token is NULL",
+          "fix_m_probability": false,
+          "fix_u_probability": false,
+          "is_null_level": true
+        },
+        {
+          "sql_condition": "\"distinctive_token_l\" = \"distinctive_token_r\"",
+          "label_for_charts": "Exact match on distinctive_token",
+          "m_probability": 0.2794808570283122,
+          "u_probability": 0.00017179822986502632,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "jaro_winkler_similarity(\"distinctive_token_l\", \"distinctive_token_r\") >= 0.9",
+          "label_for_charts": "Jaro-Winkler distance of distinctive_token >= 0.9",
+          "m_probability": 0.0033523004041527485,
+          "u_probability": 0.00021070163241491816,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "jaro_winkler_similarity(\"distinctive_token_l\", \"distinctive_token_r\") >= 0.8",
+          "label_for_charts": "Jaro-Winkler distance of distinctive_token >= 0.8",
+          "m_probability": 0.007970203952620773,
+          "u_probability": 0.0014467642622688465,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "ELSE",
+          "label_for_charts": "All other comparisons",
+          "m_probability": 0.8356182396555814,
+          "u_probability": 0.9981707358754512,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        }
+      ],
+      "comparison_description": "CustomComparison"
+    },
+    {
+      "output_column_name": "alias_match",
+      "comparison_levels": [
+        {
+          "sql_condition": "\"all_names_l\" IS NULL OR \"all_names_r\" IS NULL",
+          "label_for_charts": "all_names is NULL",
+          "fix_m_probability": false,
+          "fix_u_probability": false,
+          "is_null_level": true
+        },
+        {
+          "sql_condition": "\n                list_contains(list_transform(all_names_r, x -> LOWER(x)), LOWER(name_l)) OR \n                list_contains(list_transform(all_names_l, x -> LOWER(x)), LOWER(name_r))\n            ",
+          "label_for_charts": "Name matches alias (exact)",
+          "m_probability": 0.12142201698403544,
+          "u_probability": 7.630264681834026e-06,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "ELSE",
+          "label_for_charts": "All other comparisons",
+          "m_probability": 0.8785779830159646,
+          "u_probability": 0.9999923697353181,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        }
+      ],
+      "comparison_description": "CustomComparison"
+    },
+    {
+      "output_column_name": "country_match",
+      "comparison_levels": [
+        {
+          "sql_condition": "\"country_code_l\" IS NULL OR \"country_code_r\" IS NULL",
+          "label_for_charts": "country_code is NULL",
+          "fix_m_probability": false,
+          "fix_u_probability": false,
+          "is_null_level": true
+        },
+        {
+          "sql_condition": "\"country_code_l\" = \"country_code_r\"",
+          "label_for_charts": "Exact match on country_code",
+          "m_probability": 0.7398051792775071,
+          "u_probability": 0.1056003954988312,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "ELSE",
+          "label_for_charts": "All other comparisons",
+          "m_probability": 0.2601948207224929,
+          "u_probability": 0.8943996045011688,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        }
+      ],
+      "comparison_description": "CustomComparison"
+    },
+    {
+      "output_column_name": "city_match",
+      "comparison_levels": [
+        {
+          "sql_condition": "\"city_l\" IS NULL OR \"city_r\" IS NULL",
+          "label_for_charts": "city is NULL",
+          "fix_m_probability": false,
+          "fix_u_probability": false,
+          "is_null_level": true
+        },
+        {
+          "sql_condition": "\"city_l\" = \"city_r\"",
+          "label_for_charts": "Exact match on city",
+          "m_probability": 0.21539509444041485,
+          "u_probability": 0.0018939023216589758,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "jaro_winkler_similarity(\"city_l\", \"city_r\") >= 0.9",
+          "label_for_charts": "Jaro-Winkler distance of city >= 0.9",
+          "m_probability": 0.00023753662236233032,
+          "u_probability": 0.00013090222215697501,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        },
+        {
+          "sql_condition": "ELSE",
+          "label_for_charts": "All other comparisons",
+          "m_probability": 0.7828077506196068,
+          "u_probability": 0.9979751954561841,
+          "fix_m_probability": false,
+          "fix_u_probability": false
+        }
+      ],
+      "comparison_description": "CustomComparison"
+    }
+  ],
+  "training_metadata": {
+    "timestamp": "2026-01-09T14:50:37.956908",
+    "dim_org_records": 109851,
+    "grid_records": 109856,
+    "positive_pairs": 97782,
+    "negative_pairs": 100000,
+    "total_predictions": 282894
+  }
+}
