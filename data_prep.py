@@ -1246,6 +1246,303 @@ def create_ground_truth_pairs(
     return positive_df, negative_df
 
 
+def mine_hard_negatives(
+    combined_df: pd.DataFrame,
+    num_negatives: int = 50000,
+    strategies: list = None
+) -> pd.DataFrame:
+    """
+    Generate hard negative pairs (similar but non-matching records).
+
+    Hard negatives improve model's ability to discriminate between
+    similar-looking but distinct entities. Research shows 8-15%
+    improvement in boundary case precision.
+
+    Strategies:
+    1. Same country, different org (geographic confounders)
+    2. Similar names (Jaro-Winkler 0.7-0.95 but different ROR)
+    3. Same city, different org (local confounders)
+    4. Shared token overlap (common industry terms)
+
+    Args:
+        combined_df: Combined dim_org + GRID DataFrame with ROR IDs
+        num_negatives: Target number of hard negatives
+        strategies: List of strategies to use (default: all)
+
+    Returns:
+        DataFrame of hard negative pairs (unique_id_l, unique_id_r, is_match=False)
+    """
+    from jellyfish import jaro_winkler_similarity
+
+    if strategies is None:
+        strategies = ['same_country', 'similar_names', 'same_city', 'token_overlap']
+
+    log_step(f"Mining hard negatives (target: {num_negatives:,})...")
+
+    # Filter to records with ROR for labeling
+    df_with_ror = combined_df[combined_df['ror_id'].notna()].copy()
+
+    hard_negatives = []
+    negatives_per_strategy = num_negatives // len(strategies)
+
+    # Strategy 1: Same country, different organization
+    if 'same_country' in strategies:
+        log_step("  Strategy 1: Same country, different org...")
+        country_negatives = []
+
+        # Get top 20 countries by record count
+        top_countries = df_with_ror['country_code'].value_counts().head(20).index
+
+        for country in top_countries:
+            country_orgs = df_with_ror[df_with_ror['country_code'] == country]
+
+            if len(country_orgs) < 2:
+                continue
+
+            # Sample pairs from same country
+            n_samples = min(negatives_per_strategy // len(top_countries), len(country_orgs) // 2)
+
+            for _ in range(n_samples):
+                idx1, idx2 = np.random.choice(len(country_orgs), size=2, replace=False)
+                row1 = country_orgs.iloc[idx1]
+                row2 = country_orgs.iloc[idx2]
+
+                # Only keep if different ROR
+                if row1['ror_id'] != row2['ror_id']:
+                    country_negatives.append({
+                        'unique_id_l': row1['unique_id'],
+                        'unique_id_r': row2['unique_id'],
+                        'ror_id_l': row1['ror_id'],
+                        'ror_id_r': row2['ror_id'],
+                        'is_match': False,
+                        'hard_neg_type': 'same_country'
+                    })
+
+                if len(country_negatives) >= negatives_per_strategy:
+                    break
+
+            if len(country_negatives) >= negatives_per_strategy:
+                break
+
+        hard_negatives.extend(country_negatives[:negatives_per_strategy])
+        log_step(f"    Generated {len(country_negatives[:negatives_per_strategy]):,} same-country negatives")
+
+    # Strategy 2: Similar names (high Jaro-Winkler but different ROR)
+    if 'similar_names' in strategies:
+        log_step("  Strategy 2: Similar names, different org...")
+        similar_name_negatives = []
+
+        # Sample for efficiency
+        sample = df_with_ror.sample(min(5000, len(df_with_ror)), random_state=42)
+
+        for i, row1 in sample.iterrows():
+            if len(similar_name_negatives) >= negatives_per_strategy:
+                break
+
+            # Compare to random sample of other records
+            other_sample = sample[sample['ror_id'] != row1['ror_id']].sample(
+                min(50, len(sample) - 1), random_state=42
+            )
+
+            for j, row2 in other_sample.iterrows():
+                if row1['ror_id'] == row2['ror_id']:
+                    continue
+
+                # Calculate similarity
+                sim = jaro_winkler_similarity(
+                    str(row1['name_normalized']),
+                    str(row2['name_normalized'])
+                )
+
+                # Keep if similar but not too similar (0.7-0.95 range)
+                if 0.70 <= sim < 0.95:
+                    similar_name_negatives.append({
+                        'unique_id_l': row1['unique_id'],
+                        'unique_id_r': row2['unique_id'],
+                        'ror_id_l': row1['ror_id'],
+                        'ror_id_r': row2['ror_id'],
+                        'is_match': False,
+                        'hard_neg_type': 'similar_names',
+                        'name_similarity': sim
+                    })
+
+                if len(similar_name_negatives) >= negatives_per_strategy:
+                    break
+
+        hard_negatives.extend(similar_name_negatives[:negatives_per_strategy])
+        log_step(f"    Generated {len(similar_name_negatives[:negatives_per_strategy]):,} similar-name negatives")
+
+    # Strategy 3: Same city, different organization
+    if 'same_city' in strategies:
+        log_step("  Strategy 3: Same city, different org...")
+        city_negatives = []
+
+        # Get cities with multiple organizations
+        df_with_city = df_with_ror[df_with_ror['city'].notna()].copy()
+        city_counts = df_with_city.groupby('city').size()
+        multi_org_cities = city_counts[city_counts >= 2].index[:50]  # Top 50 cities
+
+        for city in multi_org_cities:
+            city_orgs = df_with_city[df_with_city['city'] == city]
+
+            if len(city_orgs) < 2:
+                continue
+
+            # Sample pairs
+            n_samples = min(negatives_per_strategy // len(multi_org_cities), len(city_orgs) // 2)
+
+            for _ in range(n_samples):
+                idx1, idx2 = np.random.choice(len(city_orgs), size=2, replace=False)
+                row1 = city_orgs.iloc[idx1]
+                row2 = city_orgs.iloc[idx2]
+
+                if row1['ror_id'] != row2['ror_id']:
+                    city_negatives.append({
+                        'unique_id_l': row1['unique_id'],
+                        'unique_id_r': row2['unique_id'],
+                        'ror_id_l': row1['ror_id'],
+                        'ror_id_r': row2['ror_id'],
+                        'is_match': False,
+                        'hard_neg_type': 'same_city'
+                    })
+
+                if len(city_negatives) >= negatives_per_strategy:
+                    break
+
+            if len(city_negatives) >= negatives_per_strategy:
+                break
+
+        hard_negatives.extend(city_negatives[:negatives_per_strategy])
+        log_step(f"    Generated {len(city_negatives[:negatives_per_strategy]):,} same-city negatives")
+
+    # Strategy 4: Token overlap (shared industry/domain terms)
+    if 'token_overlap' in strategies:
+        log_step("  Strategy 4: Token overlap, different org...")
+        token_negatives = []
+
+        # Get records with distinctive tokens
+        df_with_tokens = df_with_ror[df_with_ror['name_tokens'].notna()].copy()
+
+        # Sample pairs
+        sample = df_with_tokens.sample(min(3000, len(df_with_tokens)), random_state=42)
+
+        for i, row1 in sample.iterrows():
+            if len(token_negatives) >= negatives_per_strategy:
+                break
+
+            tokens1 = set(row1['name_tokens']) if isinstance(row1['name_tokens'], list) else set()
+
+            if not tokens1:
+                continue
+
+            # Find records with overlapping tokens but different ROR
+            other_sample = sample[sample['ror_id'] != row1['ror_id']].sample(
+                min(30, len(sample) - 1), random_state=42
+            )
+
+            for j, row2 in other_sample.iterrows():
+                if row1['ror_id'] == row2['ror_id']:
+                    continue
+
+                tokens2 = set(row2['name_tokens']) if isinstance(row2['name_tokens'], list) else set()
+
+                if not tokens2:
+                    continue
+
+                # Calculate token overlap
+                overlap = len(tokens1 & tokens2)
+                union = len(tokens1 | tokens2)
+
+                # Keep if moderate overlap (suggests similar domain but different entity)
+                if union > 0:
+                    jaccard = overlap / union
+                    if 0.3 <= jaccard < 0.7:
+                        token_negatives.append({
+                            'unique_id_l': row1['unique_id'],
+                            'unique_id_r': row2['unique_id'],
+                            'ror_id_l': row1['ror_id'],
+                            'ror_id_r': row2['ror_id'],
+                            'is_match': False,
+                            'hard_neg_type': 'token_overlap',
+                            'token_jaccard': jaccard
+                        })
+
+                if len(token_negatives) >= negatives_per_strategy:
+                    break
+
+        hard_negatives.extend(token_negatives[:negatives_per_strategy])
+        log_step(f"    Generated {len(token_negatives[:negatives_per_strategy]):,} token-overlap negatives")
+
+    # Convert to DataFrame
+    result = pd.DataFrame(hard_negatives)
+
+    if len(result) > 0:
+        # Remove duplicates
+        result = result.drop_duplicates(subset=['unique_id_l', 'unique_id_r'])
+
+        # Limit to target
+        if len(result) > num_negatives:
+            result = result.sample(num_negatives, random_state=42)
+
+    log_step(f"Total hard negatives mined: {len(result):,}")
+
+    return result
+
+
+def create_mixed_negative_pairs(
+    combined_df: pd.DataFrame,
+    num_total: int = 100000,
+    hard_ratio: float = 0.5
+) -> pd.DataFrame:
+    """
+    Create balanced mix of hard and random negative pairs.
+
+    Args:
+        combined_df: Combined DataFrame with ROR IDs
+        num_total: Total number of negative pairs
+        hard_ratio: Fraction of hard negatives (0-1)
+
+    Returns:
+        DataFrame of negative pairs
+    """
+    num_hard = int(num_total * hard_ratio)
+    num_random = num_total - num_hard
+
+    log_step(f"Creating mixed negatives: {num_hard:,} hard + {num_random:,} random")
+
+    # Get hard negatives
+    hard_negatives = mine_hard_negatives(combined_df, num_negatives=num_hard)
+
+    # Get random negatives (using existing function logic)
+    df_with_ror = combined_df[combined_df['ror_id'].notna()].copy()
+
+    np.random.seed(42)
+    dim_sample = df_with_ror[['unique_id', 'ror_id']].sample(n=num_random * 2, replace=True).reset_index(drop=True)
+    grid_sample = df_with_ror[['unique_id', 'ror_id']].sample(n=num_random * 2, replace=True).reset_index(drop=True)
+
+    random_neg_df = pd.DataFrame({
+        'unique_id_l': dim_sample['unique_id'].values,
+        'unique_id_r': grid_sample['unique_id'].values,
+        'ror_id_l': dim_sample['ror_id'].values,
+        'ror_id_r': grid_sample['ror_id'].values,
+    })
+    # Keep only pairs with different ROR IDs
+    random_neg_df = random_neg_df[random_neg_df['ror_id_l'] != random_neg_df['ror_id_r']].copy()
+    random_neg_df['is_match'] = False
+    random_neg_df['hard_neg_type'] = 'random'
+
+    # Limit to target
+    random_negatives = random_neg_df.head(num_random)
+
+    log_step(f"  Hard negatives: {len(hard_negatives):,}")
+    log_step(f"  Random negatives: {len(random_negatives):,}")
+
+    # Combine
+    all_negatives = pd.concat([hard_negatives, random_negatives], ignore_index=True)
+
+    return all_negatives
+
+
 # =============================================================================
 # FULL PIPELINE FUNCTIONS
 # =============================================================================
