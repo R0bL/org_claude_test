@@ -175,6 +175,108 @@ class PathConfig:
 
 
 @dataclass
+class ActiveLearningConfig:
+    """Active learning configuration for LLM validation"""
+    # Enable active learning (if False, validate all predictions)
+    ENABLE_ACTIVE_LEARNING: bool = True
+
+    # Budget for LLM validation calls
+    VALIDATION_BUDGET: int = 500  # Number of predictions to validate
+
+    # Minimum samples per source table
+    MIN_SAMPLES_PER_SOURCE: int = 10
+
+    # Source-specific priority weights (higher = more important to validate)
+    # None = auto-calculate based on inverse frequency
+    SOURCE_WEIGHTS: Dict[str, float] = field(default_factory=lambda: {
+        # Rare/difficult sources get higher weight
+        'chinese_clinical_trials_silver.trials': 0.9,
+        'chinese_clinical_trials_silver.trial_contacts': 0.9,
+        'legacy_alpha_silver._organizations_consolidated': 0.8,
+        # Common sources get lower weight
+        'open_fda_silver.ndc_drugs': 0.4,
+        'uspto_silver.patents': 0.4,
+        'nih_clinical_trials_gov_silver.cl_trial_locations': 0.5,
+    })
+
+
+@dataclass
+class LLMJudgeConfig:
+    """LLM judge configuration"""
+    # Enable LLM validation
+    ENABLE_LLM_VALIDATION: bool = True
+
+    # Model selection
+    PRIMARY_MODEL: str = "claude-sonnet-4-20250514"  # Most capable
+    FAST_MODEL: str = "claude-3-5-haiku-20241022"    # Cheaper/faster
+
+    # Bias mitigation
+    ENABLE_POSITION_BIAS_MITIGATION: bool = False  # Doubles API calls
+    ENABLE_ENSEMBLE: bool = False                   # Uses multiple models
+
+    # Parallel processing
+    MAX_WORKERS: int = 20  # Number of concurrent API calls
+
+    # Confidence calibration
+    ENABLE_CALIBRATION: bool = True
+    MIN_SAMPLES_FOR_CALIBRATION: int = 10
+
+
+@dataclass
+class MultiAgentConfig:
+    """Multi-agent validation configuration"""
+    # Enable multi-agent routing (vs always using full LLM)
+    ENABLE_MULTI_AGENT: bool = True
+
+    # Thresholds for routing decisions
+    # Use fast/deterministic agents for obvious cases
+    OBVIOUS_MATCH_THRESHOLD: float = 0.98  # Very high Splink score
+    OBVIOUS_REJECT_THRESHOLD: float = 0.60  # Very low Splink score
+
+    # Use ensemble for critical boundary cases
+    ENSEMBLE_LOWER_BOUND: float = 0.80
+    ENSEMBLE_UPPER_BOUND: float = 0.90
+
+
+@dataclass
+class TrainingConfig:
+    """Training configuration including hard negatives"""
+    # Hard negative mining
+    USE_HARD_NEGATIVES: bool = True
+    HARD_NEGATIVE_RATIO: float = 0.5  # 50% hard, 50% random
+
+    # Hard negative strategies
+    HARD_NEG_STRATEGIES: List[str] = field(default_factory=lambda: [
+        'same_country',
+        'similar_names',
+        'same_city',
+        'token_overlap'
+    ])
+
+    # Total negative samples
+    TOTAL_NEGATIVE_SAMPLES: int = 100_000
+
+
+@dataclass
+class FeedbackConfig:
+    """Human feedback collection configuration"""
+    # Enable feedback collection
+    ENABLE_FEEDBACK: bool = True
+
+    # Feedback file paths
+    FEEDBACK_FILE: str = "data/feedback.jsonl"
+    FEEDBACK_CONFIG_FILE: str = "data/feedback_config.json"
+
+    # Review candidate selection
+    REVIEW_PRIORITY: str = 'disagreements'  # or 'uncertainty', 'diversity'
+    MAX_REVIEW_CANDIDATES: int = 100
+
+    # Disagreement thresholds
+    HIGH_SPLINK_THRESHOLD: float = 0.95  # High Splink but LLM rejects
+    LOW_SPLINK_THRESHOLD: float = 0.60   # Low Splink but LLM confirms
+
+
+@dataclass
 class Config:
     """Master configuration combining all sub-configs"""
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
@@ -184,7 +286,12 @@ class Config:
     blocking: BlockingConfig = field(default_factory=BlockingConfig)
     filtering: FilterConfig = field(default_factory=FilterConfig)
     paths: PathConfig = field(default_factory=PathConfig)
-    
+    active_learning: ActiveLearningConfig = field(default_factory=ActiveLearningConfig)
+    llm_judge: LLMJudgeConfig = field(default_factory=LLMJudgeConfig)
+    multi_agent: MultiAgentConfig = field(default_factory=MultiAgentConfig)
+    training: TrainingConfig = field(default_factory=TrainingConfig)
+    feedback: FeedbackConfig = field(default_factory=FeedbackConfig)
+
     def __post_init__(self):
         """Ensure directories exist"""
         os.makedirs(self.paths.DATA_DIR, exist_ok=True)
