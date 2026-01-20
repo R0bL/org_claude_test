@@ -134,18 +134,27 @@ def build_prompt(
 ) -> str:
     """
     Build validation prompt with chain-of-thought reasoning.
-    
+
+    Uses clear labels:
+    - CANDIDATE RECORD = Incoming record that needs to be matched (from external source)
+    - REFERENCE RECORD = Your dim_org database record (known good data)
+
     Research-based design:
     - Chain-of-thought prompting improves accuracy by 15-36%
     - Contrastive examples reduce false positives
     - Multi-step reasoning outperforms single-step
     """
-    source_name = row.get('name_r', 'N/A')
-    dim_name = dim_org_record.get('name', 'N/A')
-    dim_country = dim_org_record.get('country_code', '')
-    dim_city = dim_org_record.get('city', '')
+    # CANDIDATE = incoming record from external source (name_r)
+    candidate_name = row.get('name_r', 'N/A')
+    candidate_country = row.get('country_code_r', '')
+    candidate_city = row.get('city_r', '')
     source_table = row.get('source_table', 'unknown')
-    
+
+    # REFERENCE = your dim_org database record (name_l)
+    reference_name = dim_org_record.get('name', 'N/A')
+    reference_country = dim_org_record.get('country_code', '')
+    reference_city = dim_org_record.get('city', '')
+
     # Get aliases safely (fixes numpy array bug)
     aliases = dim_org_record.get('all_names', [])
     if aliases is None:
@@ -156,50 +165,93 @@ def build_prompt(
         aliases = aliases.tolist()
     aliases_str = ", ".join(str(a) for a in list(aliases)[:3]) if aliases else "None"
 
+    # Build location context
+    candidate_location = f"{candidate_city}, {candidate_country}" if candidate_country else (candidate_city or "Unknown")
+    reference_location = f"{reference_city}, {reference_country}" if reference_country else (reference_city or "Unknown")
+
     return f"""You are an expert at organization entity resolution. Determine if these two records refer to the SAME real-world organization.
 
-## RECORD A (from {source_table}):
-Name: "{source_name}"
+## CANDIDATE RECORD (incoming data from {source_table} requiring ID assignment):
+Name: "{candidate_name}"
+Location: {candidate_location}
 
-## RECORD B (reference database):
-Name: "{dim_name}"
-Aliases: {aliases_str}
-Location: {dim_city}, {dim_country}
+## REFERENCE RECORD (your organization database - known good data):
+Name: "{reference_name}"
+Known Aliases: {aliases_str}
+Location: {reference_location}
+
+## TASK:
+Should the CANDIDATE record be assigned the same ID as the REFERENCE record?
+Answer YES only if they are the SAME organization (considering hierarchy).
 
 ## STEP-BY-STEP ANALYSIS:
 
 1. **Core Identity Check**: Do both names refer to the same core organization?
-   - Ignore legal suffixes (Inc, LLC, Ltd, GmbH, AG)
-   - Ignore location qualifiers in parentheses like "(United States)"
+   - Ignore legal suffixes (Inc, LLC, Ltd, GmbH, AG, Corporation, Co)
+   - Ignore location qualifiers in parentheses like "(United States)" or regional labels
    - Consider abbreviations (MIT = Massachusetts Institute of Technology)
 
-2. **Subsidiary vs Parent Check**: Are these DIFFERENT legal entities?
-   - "Pfizer Inc" and "Pfizer Canada" = DIFFERENT (regional subsidiary)
+2. **Hierarchy & Subsidiary Check**: Are these DIFFERENT legal entities in same org family?
+   - "Pfizer Inc" and "Pfizer Canada" = DIFFERENT (regional subsidiary - different legal entity)
    - "AbbVie" and "AbbVie Inc." = SAME (just legal suffix difference)
-   
-3. **Department Check**: Is one a department/division of the other?
-   - "Johns Hopkins Cardiology Dept" and "Johns Hopkins University" = SAME
-   - Departments belong to their parent organization
+   - "Memorial Sloan Kettering" and "Memorial Sloan Kettering Westchester" = DIFFERENT (branch location)
 
-4. **Person Name Check**: Is Record A a person's name, not an organization?
-   - 2-3 word names like "John Smith" or "Dr. Maria Garcia" = NOT an organization
-   - If Record A is a person, answer NO MATCH
+3. **Department/Division Check**: Is candidate a department of the reference?
+   - "Johns Hopkins Cardiology Dept" and "Johns Hopkins University" = SAME (department belongs to parent)
+   - "Stanford Medicine" and "Stanford University" = SAME (school within university)
+   - Departments/schools/centers should match to parent organization
+
+4. **Person Name Check**: Is the candidate a person's name, not an organization?
+   - Names like "John Smith" or "Dr. Maria Garcia" = NOT an organization
+   - If candidate is a person, answer NO
+
+5. **Geographic Consistency**: Do locations make sense?
+   - Same city = strong signal
+   - Different countries = usually different unless multinational parent
+   - Location suffix (e.g., "Hospital - Boston" vs "Hospital - New York") = DIFFERENT branches
 
 ## EXAMPLES:
 
-Record A: "Novo Nordisk (Japan)" | Record B: "Novo Nordisk" -> YES (same company, location qualifier)
-Record A: "AbbVie Inc." | Record B: "AbbVie" -> YES (same company, legal suffix)
-Record A: "MIT" | Record B: "Massachusetts Institute of Technology" -> YES (abbreviation)
-Record A: "Stanford Medicine" | Record B: "Stanford University" -> YES (department)
-Record A: "Novartis Canada" | Record B: "Novartis AG" -> NO (different subsidiary)
-Record A: "Dr. Philip Chen" | Record B: "Chen Medical Group" -> NO (person vs org)
-Record A: "Apple" | Record B: "Apple Inc." -> YES (same company)
-Record A: "Apple Records" | Record B: "Apple Inc." -> NO (different companies)
+CANDIDATE: "Novo Nordisk (Japan)" | REFERENCE: "Novo Nordisk"
+→ YES (same parent company, country qualifier doesn't create new entity)
+
+CANDIDATE: "AbbVie Inc." | REFERENCE: "AbbVie"
+→ YES (same company, legal suffix only)
+
+CANDIDATE: "MIT" | REFERENCE: "Massachusetts Institute of Technology"
+→ YES (common abbreviation)
+
+CANDIDATE: "Stanford Medicine" | REFERENCE: "Stanford University"
+→ YES (medical school is part of university hierarchy)
+
+CANDIDATE: "Novartis Canada" | REFERENCE: "Novartis AG"
+→ NO (Canadian subsidiary is separate legal entity from Swiss parent)
+
+CANDIDATE: "Memorial Sloan Kettering Westchester" | REFERENCE: "Memorial Sloan Kettering Cancer Center"
+→ NO (Westchester location is a branch, not the main center)
+
+CANDIDATE: "Genesee Hematology Oncology PC" | REFERENCE: "Genesee Cancer & Blood Disease"
+→ NO (different organizations, likely competitors)
+
+CANDIDATE: "Dr. Philip Chen" | REFERENCE: "Chen Medical Group"
+→ NO (person vs organization)
+
+CANDIDATE: "Apple Records" | REFERENCE: "Apple Inc."
+→ NO (completely different companies that happen to share a name)
 
 ## YOUR TASK:
 
-Analyze the records above and respond with ONLY this JSON:
-{{"match": true, "reason": "brief explanation"}} or {{"match": false, "reason": "brief explanation"}}"""
+Analyze the records above and respond with ONLY this JSON (no markdown, no extra text):
+{{"match": true, "confidence": 0.95, "reason": "brief explanation"}}
+
+OR
+
+{{"match": false, "confidence": 0.90, "reason": "brief explanation"}}
+
+IMPORTANT:
+- confidence must be a number between 0 and 1
+- Keep reason under 100 characters
+- Return ONLY valid JSON, nothing else"""
 
 
 def judge_match(
@@ -238,42 +290,70 @@ def judge_match(
     try:
         response = client.messages.create(
             model=model,
-            max_tokens=200,
+            max_tokens=500,  # Increased from 200 to prevent truncation
+            temperature=0,   # Deterministic for consistency
             messages=[{"role": "user", "content": prompt}]
         )
-        
+
         response_text = response.content[0].text.strip()
-        
-        # Try to parse JSON response
-        # Handle cases where model wraps JSON in markdown
+
+        # Handle markdown-wrapped JSON
         if response_text.startswith("```"):
             lines = response_text.split("\n")
             response_text = "\n".join(
-                line for line in lines 
-                if not line.startswith("```")
-            )
-        
-        result = json.loads(response_text)
-        
-        # Normalize response (confidence defaults to 0.9 for matches, 0.1 for non-matches)
+                line for line in lines
+                if not line.startswith("```") and line.strip() != "json"
+            ).strip()
+
+        # Try to extract JSON if embedded in other text
+        # Look for first { and last }
+        if "{" in response_text and "}" in response_text:
+            start_idx = response_text.find("{")
+            end_idx = response_text.rfind("}") + 1
+            json_str = response_text[start_idx:end_idx]
+        else:
+            json_str = response_text
+
+        # Parse JSON
+        result = json.loads(json_str)
+
+        # Normalize response
         is_match = bool(result.get("match"))
+        confidence = result.get("confidence")
+
+        # Validate confidence
+        if confidence is None:
+            confidence = 0.9 if is_match else 0.85
+        else:
+            confidence = max(0.0, min(1.0, float(confidence)))  # Clamp to [0,1]
+
+        reason = str(result.get("reason", ""))[:200]
+
         return {
             "llm_match": is_match,
-            "llm_confidence": float(result.get("confidence", 0.9 if is_match else 0.1)),
-            "llm_reason": str(result.get("reason", ""))[:200]
+            "llm_confidence": confidence,
+            "llm_reason": reason
         }
-        
-    except json.JSONDecodeError:
+
+    except json.JSONDecodeError as e:
+        # Better error handling for parse errors
         return {
             "llm_match": None,
             "llm_confidence": 0,
-            "llm_reason": f"parse_error: {response_text[:100]}"
+            "llm_reason": f"JSON parse error: {response_text[:150]}... (at position {e.pos})"
+        }
+    except KeyError as e:
+        # Missing expected key in JSON
+        return {
+            "llm_match": None,
+            "llm_confidence": 0,
+            "llm_reason": f"Missing key in response: {str(e)} - Response: {response_text[:100]}"
         }
     except Exception as e:
         return {
             "llm_match": None,
             "llm_confidence": 0,
-            "llm_reason": f"error: {str(e)[:100]}"
+            "llm_reason": f"error: {type(e).__name__}: {str(e)[:100]}"
         }
 
 
