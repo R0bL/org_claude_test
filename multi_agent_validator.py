@@ -166,7 +166,7 @@ class MatchingAgentOrchestrator:
             }
 
         # Length ratio check (one name 3x longer = likely parent/subsidiary)
-        len_ratio = max(len(name_l), len(name_r)) / max(len(min(len(name_l), len(name_r))), 1)
+        len_ratio = max(len(name_l), len(name_r)) / max(min(len(name_l), len(name_r)), 1)
         if len_ratio > 3.0 and similarity < 0.7:
             return {
                 'llm_match': False,
@@ -452,9 +452,16 @@ def batch_validate_with_agents(predictions_df: pd.DataFrame,
     results = []
 
     for idx, row in predictions_df.iterrows():
-        # Get corresponding dim_org record
-        dim_org_id = row['unique_id_l']
-        dim_org_record = dim_org_df[dim_org_df['unique_id'] == dim_org_id].iloc[0].to_dict()
+        # Build dim_org_record from row data (may be rolled-up parent)
+        # This avoids re-lookup and ensures we use the correct (possibly substituted) org
+        dim_org_record = {
+            'unique_id': row.get('unique_id_l'),
+            'name': row.get('name_l'),
+            'name_normalized': row.get('name_normalized_l'),
+            'country_code': row.get('country_code_l'),
+            'city': row.get('city_l'),
+            'all_names': row.get('all_names_l', [])
+        }
 
         # Extract metadata
         metadata = {

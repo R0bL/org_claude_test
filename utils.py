@@ -44,10 +44,18 @@ class DatabaseManager:
     def get_connection(self):
         """Lazy connection initialization"""
         if self._connection is None:
+            # Read env vars directly at connection time (not from cached config)
+            import os
+            aws_key = os.getenv("AWS_ACCESS_KEY_ID") or self.config.AWS_ACCESS_KEY_ID
+            aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY") or self.config.AWS_SECRET_ACCESS_KEY
+            region = os.getenv("AWS_REGION") or self.config.AWS_REGION
+            s3_dir = os.getenv("S3_STAGING_DIR") or self.config.S3_STAGING_DIR
+            
             self._connection = connect(
-                aws_access_key_id=self.config.AWS_ACCESS_KEY_ID,
-                s3_staging_dir=self.config.S3_STAGING_DIR,
-                region_name=self.config.AWS_REGION,
+                aws_access_key_id=aws_key,
+                aws_secret_access_key=aws_secret,
+                s3_staging_dir=s3_dir,
+                region_name=region,
                 cursor_class=PandasCursor
             )
             self._cursor = self._connection.cursor()
