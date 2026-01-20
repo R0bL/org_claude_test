@@ -327,6 +327,11 @@ def create_unified_schema(df: pd.DataFrame, source: str) -> pd.DataFrame:
     result['source'] = source
     result['source_id'] = df.get('allsci_id', df.get('grid_id', df.get('mismatch_id')))
     
+    # For mismatched records, preserve source_table and source_entity_id
+    if source == 'mismatched':
+        result['source_table'] = df.get('source_table')
+        result['source_entity_id'] = df.get('source_entity_id')
+    
     log_step(f"  Created unified schema: {len(result):,} rows, {len(result.columns)} columns")
     return result
 
@@ -1616,6 +1621,134 @@ def load_and_prepare_inference_data(
         df = create_blocking_keys(df)
     
     return df
+
+
+# =============================================================================
+# HIERARCHY ROLL-UP
+# =============================================================================
+
+def rollup_to_parent(
+    predictions_df: pd.DataFrame,
+    hierarchy_df: pd.DataFrame,
+    dim_org_df: pd.DataFrame
+) -> Tuple[pd.DataFrame, Dict]:
+    """
+    For predictions where source has no location info, substitute matched 
+    subsidiary with parent organization.
+    
+    This prevents matching to region-specific subsidiaries (e.g., "Texas Instruments (Japan)")
+    when the source record lacks geographic context.
+    
+    Args:
+        predictions_df: Predictions with unique_id_l (matched org), country_code_r, city_r
+        hierarchy_df: Hierarchy with child_id, parent_id columns
+        dim_org_df: Reference data with unique_id, name, country_code, city
+        
+    Returns:
+        Tuple of (updated predictions DataFrame, rollup statistics dict)
+    """
+    log_step("Hierarchy roll-up: checking for subsidiary matches without location context...")
+    
+    if hierarchy_df is None or len(hierarchy_df) == 0:
+        log_step("  No hierarchy data available - skipping roll-up", "WARN")
+        return predictions_df, {'rolled_up': 0, 'total_checked': 0}
+    
+    predictions_df = predictions_df.copy()
+    
+    # Build child→parent lookup (child_id -> parent_id)
+    # Normalize IDs to match dim_org format (add 'dim_' prefix if needed)
+    def normalize_org_id(org_id):
+        if pd.isna(org_id):
+            return None
+        org_id = str(org_id)
+        if not org_id.startswith('dim_'):
+            return f'dim_{org_id}'
+        return org_id
+    
+    child_to_parent = {}
+    for _, row in hierarchy_df.iterrows():
+        child_id = normalize_org_id(row.get('child_id'))
+        parent_id = normalize_org_id(row.get('parent_id'))
+        if child_id and parent_id:
+            child_to_parent[child_id] = parent_id
+    
+    log_step(f"  Loaded {len(child_to_parent):,} child→parent mappings")
+    
+    # Build dim_org lookup for getting parent org details
+    dim_org_lookup = {}
+    for _, row in dim_org_df.iterrows():
+        uid = row.get('unique_id')
+        if uid:
+            dim_org_lookup[uid] = {
+                'name': row.get('name'),
+                'name_normalized': row.get('name_normalized'),
+                'country_code': row.get('country_code'),
+                'city': row.get('city'),
+                'all_names': row.get('all_names', row.get('name_aliases', []))
+            }
+    
+    # Identify predictions needing rollup:
+    # - source has no country AND no city (location unknown)
+    # - matched org has a parent in hierarchy
+    location_missing = (
+        (predictions_df['country_code_r'].isna() | (predictions_df['country_code_r'] == '')) &
+        (predictions_df['city_r'].isna() | (predictions_df['city_r'] == ''))
+    )
+    
+    total_missing_location = location_missing.sum()
+    log_step(f"  Predictions with missing source location: {total_missing_location:,}")
+    
+    # Track rollups
+    rolled_up_count = 0
+    rollup_details = []
+    
+    for idx in predictions_df[location_missing].index:
+        matched_id = predictions_df.loc[idx, 'unique_id_l']
+        
+        # Check if this org has a parent
+        if matched_id in child_to_parent:
+            parent_id = child_to_parent[matched_id]
+            
+            # Get parent org details
+            if parent_id in dim_org_lookup:
+                parent_info = dim_org_lookup[parent_id]
+                original_name = predictions_df.loc[idx, 'name_l']
+                
+                # Substitute with parent
+                predictions_df.loc[idx, 'unique_id_l'] = parent_id
+                predictions_df.loc[idx, 'name_l'] = parent_info['name']
+                predictions_df.loc[idx, 'name_normalized_l'] = parent_info['name_normalized']
+                predictions_df.loc[idx, 'country_code_l'] = parent_info['country_code']
+                predictions_df.loc[idx, 'city_l'] = parent_info['city']
+                if 'all_names_l' in predictions_df.columns:
+                    predictions_df.at[idx, 'all_names_l'] = parent_info['all_names']
+                
+                # Mark as rolled up
+                predictions_df.loc[idx, 'rolled_up_from'] = matched_id
+                predictions_df.loc[idx, 'rolled_up_from_name'] = original_name
+                
+                rolled_up_count += 1
+                rollup_details.append({
+                    'original_id': matched_id,
+                    'original_name': original_name,
+                    'parent_id': parent_id,
+                    'parent_name': parent_info['name']
+                })
+    
+    stats = {
+        'total_checked': total_missing_location,
+        'rolled_up': rolled_up_count,
+        'rollup_details': rollup_details[:10]  # Keep first 10 for logging
+    }
+    
+    log_step(f"  Rolled up {rolled_up_count:,} predictions to parent organizations")
+    
+    if rolled_up_count > 0 and len(rollup_details) > 0:
+        log_step("  Sample rollups:")
+        for detail in rollup_details[:3]:
+            log_step(f"    {detail['original_name'][:40]} -> {detail['parent_name'][:40]}")
+    
+    return predictions_df, stats
 
 
 if __name__ == "__main__":

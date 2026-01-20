@@ -202,6 +202,41 @@ Analyze the records above and respond with ONLY this JSON:
 {{"match": true, "reason": "brief explanation"}} or {{"match": false, "reason": "brief explanation"}}"""
 
 
+def extract_match_from_text(text: str) -> Optional[Dict[str, Any]]:
+    """
+    Fallback: extract match decision from free-form LLM response.
+    
+    Used when JSON parsing fails but response contains clear match indicators.
+    """
+    text_lower = text.lower()
+    
+    # Clear NO MATCH indicators
+    no_match_phrases = [
+        "no match", "not a match", "different", "not the same", 
+        "distinct entities", "separate organizations", "-> no"
+    ]
+    if any(phrase in text_lower for phrase in no_match_phrases):
+        return {
+            "llm_match": False, 
+            "llm_confidence": 0.6, 
+            "llm_reason": text[:150]
+        }
+    
+    # Clear MATCH indicators
+    match_phrases = [
+        "yes", "-> yes", "same organization", "same entity", 
+        "is a match", "are the same", "match: true"
+    ]
+    if any(phrase in text_lower for phrase in match_phrases):
+        return {
+            "llm_match": True, 
+            "llm_confidence": 0.6, 
+            "llm_reason": text[:150]
+        }
+    
+    return None  # Can't determine from text
+
+
 def judge_match(
     row: Dict,
     dim_org_record: Dict,
@@ -236,17 +271,23 @@ def judge_match(
     prompt = build_prompt(row, dim_org_record, metadata, geo_distance)
     
     try:
+        # Use system message and response prefilling to force JSON output
         response = client.messages.create(
             model=model,
             max_tokens=200,
-            messages=[{"role": "user", "content": prompt}]
+            system="You are a JSON-only responder. Output ONLY valid JSON with keys 'match' (boolean) and 'reason' (string). No other text.",
+            messages=[
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": "{"}  # Prefill forces JSON start
+            ]
         )
         
-        response_text = response.content[0].text.strip()
+        # Prepend the prefilled "{" to complete the JSON
+        response_text = "{" + response.content[0].text.strip()
         
         # Try to parse JSON response
         # Handle cases where model wraps JSON in markdown
-        if response_text.startswith("```"):
+        if "```" in response_text:
             lines = response_text.split("\n")
             response_text = "\n".join(
                 line for line in lines 
@@ -264,6 +305,11 @@ def judge_match(
         }
         
     except json.JSONDecodeError:
+        # Try fallback parsing from free-form text
+        fallback_result = extract_match_from_text(response_text)
+        if fallback_result:
+            return fallback_result
+        
         return {
             "llm_match": None,
             "llm_confidence": 0,

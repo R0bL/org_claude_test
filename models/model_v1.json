@@ -5,7 +5,7 @@
   "retain_intermediate_calculation_columns": false,
   "additional_columns_to_retain": [],
   "sql_dialect": "duckdb",
-  "linker_uid": "126n6369",
+  "linker_uid": "pb7mnzlb",
   "em_convergence": 0.0001,
   "max_iterations": 25,
   "bayes_factor_column_prefix": "bf_",
@@ -45,8 +45,8 @@
         {
           "sql_condition": "\"name_normalized_l\" = \"name_normalized_r\"",
           "label_for_charts": "Exact match on name_normalized",
-          "m_probability": 0.09439256709082217,
-          "u_probability": 9.641283977993769e-06,
+          "m_probability": 0.09439389474946677,
+          "u_probability": 1.2885959458573939e-05,
           "fix_m_probability": false,
           "fix_u_probability": false,
           "tf_adjustment_column": "name_normalized",
@@ -55,32 +55,32 @@
         {
           "sql_condition": "jaro_winkler_similarity(\"name_normalized_l\", \"name_normalized_r\") >= 0.95",
           "label_for_charts": "Jaro-Winkler distance of name_normalized >= 0.95",
-          "m_probability": 0.0018490114964220556,
-          "u_probability": 2.008600828748702e-06,
+          "m_probability": 0.001871696235248645,
+          "u_probability": 1.897932013278332e-06,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "jaro_winkler_similarity(\"name_normalized_l\", \"name_normalized_r\") >= 0.88",
           "label_for_charts": "Jaro-Winkler distance of name_normalized >= 0.88",
-          "m_probability": 0.04602048653797184,
-          "u_probability": 0.00013839259710078558,
+          "m_probability": 0.04614690544824135,
+          "u_probability": 0.0001707139900364563,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "jaro_winkler_similarity(\"name_normalized_l\", \"name_normalized_r\") >= 0.8",
           "label_for_charts": "Jaro-Winkler distance of name_normalized >= 0.8",
-          "m_probability": 0.29021342199310873,
-          "u_probability": 0.0016995775912457141,
+          "m_probability": 0.2902731751060336,
+          "u_probability": 0.0017397044180660752,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "ELSE",
           "label_for_charts": "All other comparisons",
-          "m_probability": 0.4618190209646907,
-          "u_probability": 0.9981503799268467,
+          "m_probability": 0.46160737258525425,
+          "u_probability": 0.9980747977004256,
           "fix_m_probability": false,
           "fix_u_probability": false
         }
@@ -100,16 +100,16 @@
         {
           "sql_condition": "\"distinctive_soundex_l\" = \"distinctive_soundex_r\"",
           "label_for_charts": "Exact match on distinctive_soundex",
-          "m_probability": 0.4072576818327149,
-          "u_probability": 0.001050291343259096,
+          "m_probability": 0.4076355019145829,
+          "u_probability": 0.0011214059838943883,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "ELSE",
           "label_for_charts": "All other comparisons",
-          "m_probability": 0.8398952775981493,
-          "u_probability": 0.9989497086567409,
+          "m_probability": 0.8398917918920015,
+          "u_probability": 0.9988785940161056,
           "fix_m_probability": false,
           "fix_u_probability": false
         }
@@ -129,32 +129,32 @@
         {
           "sql_condition": "array_length(distinctive_tokens_l, 1) = 0 OR array_length(distinctive_tokens_r, 1) = 0",
           "label_for_charts": "Empty array (short name)",
-          "m_probability": 0.00011201233515597098,
-          "u_probability": 0.0012670255300624397,
+          "m_probability": 0.0005568200784624292,
+          "u_probability": 0.001895434734313492,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "array_length(list_intersect(\"distinctive_tokens_l\", \"distinctive_tokens_r\")) >= 2",
           "label_for_charts": "Array intersection size >= 2",
-          "m_probability": 0.0942440403729413,
-          "u_probability": 4.839194179794738e-05,
+          "m_probability": 0.09424404037294133,
+          "u_probability": 5.593904881241399e-05,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "array_length(list_intersect(\"distinctive_tokens_l\", \"distinctive_tokens_r\")) >= 1",
           "label_for_charts": "Array intersection size >= 1",
-          "m_probability": 0.5600069570318617,
-          "u_probability": 0.0020418989881465844,
+          "m_probability": 0.5600069576525792,
+          "u_probability": 0.002249149326893417,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "ELSE",
           "label_for_charts": "All other comparisons",
-          "m_probability": 0.7428407956687446,
-          "u_probability": 0.9966426835399931,
+          "m_probability": 0.7428352149420594,
+          "u_probability": 0.9957994768899807,
           "fix_m_probability": false,
           "fix_u_probability": false
         }
@@ -174,24 +174,24 @@
         {
           "sql_condition": "array_length(list_intersect(\"distinctive_tokens_l\", \"distinctive_tokens_r\")) >= 2",
           "label_for_charts": "Array intersection size >= 2",
-          "m_probability": 0.0942440403729413,
-          "u_probability": 4.839194179794738e-05,
+          "m_probability": 0.09424404037294132,
+          "u_probability": 5.593904881241399e-05,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "array_length(list_intersect(\"distinctive_tokens_l\", \"distinctive_tokens_r\")) >= 1",
           "label_for_charts": "Array intersection size >= 1",
-          "m_probability": 0.5600069570318617,
-          "u_probability": 0.0020418989881465844,
+          "m_probability": 0.5600069576525792,
+          "u_probability": 0.002249149326893417,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "ELSE",
           "label_for_charts": "All other comparisons",
-          "m_probability": 0.3719772177851761,
-          "u_probability": 0.9979097090700555,
+          "m_probability": 0.3761930936936655,
+          "u_probability": 0.9976949116242941,
           "fix_m_probability": false,
           "fix_u_probability": false
         }
@@ -211,40 +211,40 @@
         {
           "sql_condition": "list_sort(name_tokens_l) = list_sort(name_tokens_r)",
           "label_for_charts": "Exact token match",
-          "m_probability": 0.12192737915195988,
-          "u_probability": 9.738627291288165e-06,
+          "m_probability": 0.12193003528612247,
+          "u_probability": 1.3085741775761131e-05,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "\n                ABS(len(name_tokens_l) - len(name_tokens_r)) <= 1\n                AND len(list_intersect(name_tokens_l, name_tokens_r)) >= \n                    GREATEST(len(name_tokens_l), len(name_tokens_r)) - 1\n            ",
           "label_for_charts": "Similar tokens (diff <= 1)",
-          "m_probability": 0.048415739684973765,
-          "u_probability": 0.025987376329473223,
+          "m_probability": 0.04820527137016464,
+          "u_probability": 0.028491655492175725,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "\n                (len(name_tokens_l) <= 2 OR len(name_tokens_r) <= 2)\n                AND len(list_intersect(name_tokens_l, name_tokens_r)) >= 1\n            ",
           "label_for_charts": "Short name with overlap",
-          "m_probability": 0.11122311416343231,
-          "u_probability": 0.0075115939863876074,
+          "m_probability": 0.11089463873453273,
+          "u_probability": 0.00729125544806379,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "\n                (list_sort(list_intersect(name_tokens_l, name_tokens_r)) = list_sort(name_tokens_l)\n                 AND len(name_tokens_l) < len(name_tokens_r))\n                OR\n                (list_sort(list_intersect(name_tokens_l, name_tokens_r)) = list_sort(name_tokens_r)\n                 AND len(name_tokens_r) < len(name_tokens_l))\n            ",
           "label_for_charts": "Subset containment (suspicious)",
-          "m_probability": 0.0016796342507550649,
-          "u_probability": 0.0002710751926441036,
+          "m_probability": 0.0016796505835785752,
+          "u_probability": 9.98911585935964e-07,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "ELSE",
           "label_for_charts": "All other comparisons",
-          "m_probability": 0.7196209073634167,
-          "u_probability": 0.9662202158642038,
+          "m_probability": 0.7196185810306528,
+          "u_probability": 0.9642030044063988,
           "fix_m_probability": false,
           "fix_u_probability": false
         }
@@ -264,32 +264,32 @@
         {
           "sql_condition": "\"distinctive_token_l\" = \"distinctive_token_r\"",
           "label_for_charts": "Exact match on distinctive_token",
-          "m_probability": 0.2794808570283122,
-          "u_probability": 0.00017179822986502632,
+          "m_probability": 0.279488205256779,
+          "u_probability": 0.00017664270964512228,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "jaro_winkler_similarity(\"distinctive_token_l\", \"distinctive_token_r\") >= 0.9",
           "label_for_charts": "Jaro-Winkler distance of distinctive_token >= 0.9",
-          "m_probability": 0.0033523004041527485,
-          "u_probability": 0.00021070163241491816,
+          "m_probability": 0.003352353256497338,
+          "u_probability": 0.00021987763914466498,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "jaro_winkler_similarity(\"distinctive_token_l\", \"distinctive_token_r\") >= 0.8",
           "label_for_charts": "Jaro-Winkler distance of distinctive_token >= 0.8",
-          "m_probability": 0.007970203952620773,
-          "u_probability": 0.0014467642622688465,
+          "m_probability": 0.007970338442828745,
+          "u_probability": 0.001469186956141867,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "ELSE",
           "label_for_charts": "All other comparisons",
-          "m_probability": 0.8356182396555814,
-          "u_probability": 0.9981707358754512,
+          "m_probability": 0.8356147177753556,
+          "u_probability": 0.9981342926950684,
           "fix_m_probability": false,
           "fix_u_probability": false
         }
@@ -309,16 +309,16 @@
         {
           "sql_condition": "\n                list_contains(list_transform(all_names_r, x -> LOWER(x)), LOWER(name_l)) OR \n                list_contains(list_transform(all_names_l, x -> LOWER(x)), LOWER(name_r))\n            ",
           "label_for_charts": "Name matches alias (exact)",
-          "m_probability": 0.12142201698403544,
-          "u_probability": 7.630264681834026e-06,
+          "m_probability": 0.1214246621096808,
+          "u_probability": 1.0388680493734027e-05,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "ELSE",
           "label_for_charts": "All other comparisons",
-          "m_probability": 0.8785779830159646,
-          "u_probability": 0.9999923697353181,
+          "m_probability": 0.8785753378903192,
+          "u_probability": 0.9999896113195063,
           "fix_m_probability": false,
           "fix_u_probability": false
         }
@@ -338,16 +338,16 @@
         {
           "sql_condition": "\"country_code_l\" = \"country_code_r\"",
           "label_for_charts": "Exact match on country_code",
-          "m_probability": 0.7398051792775071,
-          "u_probability": 0.1056003954988312,
+          "m_probability": 0.7398051800976313,
+          "u_probability": 0.10753570944812818,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "ELSE",
           "label_for_charts": "All other comparisons",
-          "m_probability": 0.2601948207224929,
-          "u_probability": 0.8943996045011688,
+          "m_probability": 0.2601948199023687,
+          "u_probability": 0.8924642905518718,
           "fix_m_probability": false,
           "fix_u_probability": false
         }
@@ -367,24 +367,24 @@
         {
           "sql_condition": "\"city_l\" = \"city_r\"",
           "label_for_charts": "Exact match on city",
-          "m_probability": 0.21539509444041485,
-          "u_probability": 0.0018939023216589758,
+          "m_probability": 0.2151104878264644,
+          "u_probability": 0.0021349714587279383,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "jaro_winkler_similarity(\"city_l\", \"city_r\") >= 0.9",
           "label_for_charts": "Jaro-Winkler distance of city >= 0.9",
-          "m_probability": 0.00023753662236233032,
-          "u_probability": 0.00013090222215697501,
+          "m_probability": 0.00023753662236232958,
+          "u_probability": 0.0001005216995138884,
           "fix_m_probability": false,
           "fix_u_probability": false
         },
         {
           "sql_condition": "ELSE",
           "label_for_charts": "All other comparisons",
-          "m_probability": 0.7828077506196068,
-          "u_probability": 0.9979751954561841,
+          "m_probability": 0.7830511443741772,
+          "u_probability": 0.9977645068417582,
           "fix_m_probability": false,
           "fix_u_probability": false
         }
@@ -393,11 +393,11 @@
     }
   ],
   "training_metadata": {
-    "timestamp": "2026-01-09T14:50:37.956908",
+    "timestamp": "2026-01-20T14:32:10.607781",
     "dim_org_records": 109851,
     "grid_records": 109856,
     "positive_pairs": 97782,
-    "negative_pairs": 100000,
-    "total_predictions": 282894
+    "negative_pairs": 99999,
+    "total_predictions": 283141
   }
 }
